@@ -1,11 +1,13 @@
-# RunGuard Feature Contract v0 (day approach)
+# RunGuard Feature Contract v0 (using day_approach dataset)
 
-This file defines the exact input the model expects. Two sides must produce identical columns:
+This file defines the exact input the ML model expects for training & prediction. The following must produce identical columns:
 
-- **Training side (D2):** selects these columns from `day_approach_maskedID_timeseries.csv` (Lövdal et al., 2021).
+- **Training side (D2):** selects these columns from `day_approach_maskedID_timeseries.csv`.
 - **App side (A2):** builds one row with these columns from a runner's Strava `activities.csv`.
 
 Copy column names from this file. Don't retype them: `nr. sessions` with a missing space or dot breaks the model.
+
+**Note: All features below are raw values, without any scaling or normalization.** Scaling, if needed, belongs in the model pipeline, so both the training side and the app side must supply the unscaled values exactly as defined here.
 
 ## 1. Base features
 
@@ -18,25 +20,25 @@ Each base feature is computed once per day for 7 days (see section 2), giving **
 | 3 | `strength training` | count | Number of strength activities that day. | 0 |
 | 4 | `hours alternative` | hours | Sum of `Moving Time` of alternative activities that day. `Moving Time` is in seconds, so divide by 3600. | 0 |
 
-No `-0.01` placeholder is needed. The training data uses it only in the perceived-feedback columns, and those are dropped (section 5).
-
 ## 2. Time window and column order
 
-- **Event day = today**, using the **user's local date**.
-- **The window is the 7 full days before today.** Today's activities are excluded, because in the training data the event day itself is not part of the window.
-- **Suffixes count up toward the event day** (dataset README v2):
+- **Event day = date after last 7 days of data available** (assuming the upload might not be done using today's data).
+- **The time window is the 7 full days before an event.** In the training data the event day itself is not part of the window.
+- **Suffixes count up toward the event day**:
 
 | Suffix | Day |
 |---|---|
-| *(none)* | 7 days before today (oldest) |
+| *(none)* | 7 days before event |
 | `.1` | 6 days before |
 | `.2` | 5 days before |
 | `.3` | 4 days before |
 | `.4` | 3 days before |
 | `.5` | 2 days before |
-| `.6` | yesterday |
+| `.6` | 1 day before |
 
-- **Column order matters,** because the model reads columns by position. The order is day by day, oldest first, with the 4 features in table order within each day. Exact order:
+**Column order matters,** because the model reads columns by position. The order is day by day, oldest first, with the 4 features in table order within each day.
+
+**The input for model training & prediction should follow exactly the below column order:**
 
 ```
 nr. sessions
@@ -71,40 +73,37 @@ hours alternative.6
 
 ## 3. Strava activity type mapping
 
-Based on the `Activity Type` column.
+Based on the `Activity Type` column in Strava data, this table shows which activities feed which features.
 
-| Group | Activity types | Feeds |
+| Group | Activity types | Feeds feature |
 |---|---|---|
-| Strength | Weight Training, Crossfit | `strength training`, `nr. sessions` |
-| Alternative | Ride, Swim, Hike, Walk, Yoga, Virtual Ride, Workout | `hours alternative`, `nr. sessions` |
-| Run | Every type containing "Run" (e.g. Run, Trail Run, Virtual Run) | `total km`, `nr. sessions` |
-| Ignored | Any other type not listed above | nothing |
-| Excluded | Any activity with `Commute` = True | nothing |
+| Strength | Workout, Weight Training, Crossfit | `strength training`, `nr. sessions` |
+| Alternative | Ride, Virtual Ride, Mountain Bike Ride, Gravel Ride, Swim, Open Water Swim, Hike, Walk, Yoga, Pilates | `hours alternative`, `nr. sessions` |
+| Run | Run, Trail Run, Virtual Run | `total km`, `nr. sessions` |
+| Excluded | Any other type not listed above | nothing |
 
-## 4. Not enough data
-
-If the 7-day window contains **no run activity**, the app does not predict. It shows:
-
-> Not enough data to calculate current injury risk.
-
-## 5. Features left out of v0
+## 4. Features left out of v0
 
 | Training feature | Reason |
 |---|---|
-| `km Z3-4`, `km Z5-T1-T2` | They need a heart-rate zone approximation, and only about 53% of runs have HR. Candidate for v1. |
+| `km Z3-4`, `km Z5-T1-T2` | They need a heart-rate zone approximation, and only about 53% of my runs have HR. Let's do this as in v1 iteration. |
 | `km sprinting` | No Strava source. |
 | `perceived exertion` | Strava RPE is filled on 0.5% of runs, and its scale (1–10) differs from the training data (0–1). |
 | `perceived trainingSuccess`, `perceived recovery` | No Strava source. |
 
-## 6. Example
+##  5. Target and non-feature columns
 
-`example_row.csv` is a real row built from Dominik's export with event day 2026-10-15. Use it as stub input for the API and UI.
+These columns exist only in the training data. The app never builds them.
 
-## 7. Sign-off
+| Column | Role | Definition |
+|---|---|---|
+| `injury` | Target | 1 = the athlete got injured on the event day, 0 = no injury. 583 of 42,766 rows are 1 (1.36%), spread over 63 of 74 athletes. |
+| `Athlete ID` | Split only | Used for the athlete-grouped train/test split. **Never a feature.** |
+| `Date` | Split / ordering only | Event day, counted in days from the first record (0–2,673). Consecutive rows of one athlete share 6 of 7 window days. **Never a feature.** |
 
-- [ ] D2 training preprocessing — can select these columns
-- [ ] B2 model — can train on these columns
-- [ ] A2 Strava features — can build these columns
-- [ ] N2 API — expects these columns
+## 5. Example
+
+[`example_row.csv`](https://drive.google.com/file/d/1h3a4XUSqcwW2y8qOtnYyZA0p0gchx4uB/view?usp=drive_link) is a real row built from Dominik's export with event day 2026-10-15.
+Use it as a mock input for the model training, API, UI etc. before Strava data processing pipe is ready.
 
 *Contract version: v0*
