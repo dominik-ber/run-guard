@@ -1,12 +1,12 @@
 """Build the model input row from a clean Strava activity log (task A2).
 
-Turns the output of `runguard.preprocessing.strava_clean.clean_activities` into
+Turns the output of `RunGuard.preprocessing.strava_clean.clean_activities` into
 exactly the columns the model was trained on, in the order of FEATURE_CONTRACT.md.
 
 Typical use from the API:
 
-    from runguard.preprocessing.strava_clean import clean_activities
-    from runguard.features.strava import build_features
+    from RunGuard.preprocessing.strava_clean import clean_activities
+    from RunGuard.features.strava import build_features
 
     activities = clean_activities("activities.csv")
     row = build_features(activities)  # event day = the day after the last activity

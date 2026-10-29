@@ -2,7 +2,7 @@
 
 The raw export has duplicate column names, text-formatted numbers and activity
 types the model does not use. This module turns it into a clean activity log
-that `runguard.features.strava` can build the contract features from.
+that `RunGuard.features.strava` can build the contract features from.
 
 Conversion rules: FEATURE_CONTRACT.md and docs/STRAVA_CONVERSION_DECISIONS.md.
 """
