@@ -3,6 +3,14 @@ import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold
 
 def train_test_data_prep(data: pd.DataFrame):
+    """Prepare training data for the ML model.
+
+    Args:
+        data: Raw data from the "day_approach_maskedID_timeseries.csv" file as Pandas DataFrame.
+
+    Returns:
+        X_train, y_train, X_test, y_test
+    """
 
     columns = ['nr. sessions',
     'total km',
