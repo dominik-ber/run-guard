@@ -22,9 +22,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Upload
+# Upload --> this is where "activities.csv" download from Strava is loaded
 uploaded_file = st.file_uploader("Upload your training data (CSV)", type="csv")
 
 # Predict
 if st.button("Predict"):
-    pass  # TODO: process CSV and call /predict
+    # TODO: process CSV and call /predict — fake response until the API is ready
+    response = {"risk_score": "Low", "probability": 0.27}
+
+    st.write(f"Current injury risk score: **{response['risk_score']}**")
+    st.write(f"Probability of injury at next run: **{response['probability']:.0%}**")
+
+# Footer
+st.divider()
+st.caption("Not medical advice, prediction model trained on elite runners.")
