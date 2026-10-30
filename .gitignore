@@ -3,3 +3,9 @@ raw_data/
 .env
 *.local
 *.csv
+data/processed/
+data/raw
+notebooks/
+.claude/
+build/
+runguard.egg-info/
