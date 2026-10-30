@@ -59,30 +59,30 @@ def evaluate_injury_risk(y_true, scores):
     }
 
 def plot_roc_pr_curves(y_true, y_scores):
-  """Trace les courbes ROC-AUC et PR-AUC côte à côte.
+  """
+  Plot the ROC-AUC and PR-AUC curves side by side.
 
   Parameters:
-  - y_true : Vraies étiquettes (0 ou 1)
-  - y_scores : Probabilités prédites pour la classe positive (entre 0 et 1)
+  - y_true : Trues labels (0 ou 1)
+  - y_scores : Predicted probabilities for the positive class (between 0 and 1)
   """
-  # 1. Calculs pour la courbe ROC
+  # 1. ROC curve calcul
   fpr, tpr, _ = roc_curve(y_true, y_scores)
   roc_auc = auc(fpr, tpr)
 
-  # 2. Calculs pour la courbe Precision-Recall
+  # 2. Precision-Recall curve calcul
   precision, recall, _ = precision_recall_curve(y_true, y_scores)
   pr_auc = average_precision_score(y_true, y_scores)
 
-  # Création de la figure avec deux sous-graphiques côte à côte
-  fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+  _, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-  # --- Graphique 1 : ROC-AUC ---
+  # --- plot 1 : ROC-AUC ---
   axes[0].plot(
       fpr,
       tpr,
       color='darkorange',
       lw=2,
-      label=f'Courbe ROC (AUC = {roc_auc:.3f})',
+      label=f'ROC curve (AUC = {roc_auc:.3f})',
   )
   axes[0].plot(
       [0, 1],
@@ -90,23 +90,23 @@ def plot_roc_pr_curves(y_true, y_scores):
       color='navy',
       lw=2,
       linestyle='--',
-      label='Aléatoire (0.500)',
+      label='Random (0.500)',
   )
   axes[0].set_xlim([0.0, 1.0])
   axes[0].set_ylim([0.0, 1.05])
   axes[0].set_xlabel('False positive rate (FPR)', fontsize=12)
   axes[0].set_ylabel('True positive rate (TPR / Recall)', fontsize=12)
-  axes[0].set_title('Courbe ROC', fontsize=14, fontweight='bold')
+  axes[0].set_title('ROC curve', fontsize=14, fontweight='bold')
   axes[0].legend(loc='lower right', fontsize=11)
   axes[0].grid(alpha=0.3)
 
-  # --- Graphique 2 : PR-AUC ---
+  # --- plot 2 : PR-AUC ---
   axes[1].plot(
       recall,
       precision,
       color='blue',
       lw=2,
-      label=f'Courbe PR (AP = {pr_auc:.3f})',
+      label=f'PR curve (AP = {pr_auc:.3f})',
   )
   axes[1].set_xlim([0.0, 1.0])
   axes[1].set_ylim([0.0, 1.05])
@@ -124,13 +124,12 @@ def plot_roc_pr_curves(y_true, y_scores):
 
 
 
-# ==========================================
-# Exemple d'utilisation avec votre structure
-# ==========================================
+# Exemple
+
 if __name__ == "__main__":
 
     df = pd.read_csv("injury_prediction_dataset.csv")
     no_skill_scores = get_noskill_baseline(df)
     simple_rule_scores = get_simple_rule_baseline(df)
 
-plot_roc_pr_curves(no_skill_scores['y_true'], no_skill_scores['scores'])
+    plot_roc_pr_curves(no_skill_scores['y_true'], no_skill_scores['scores'])
