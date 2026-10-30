@@ -129,5 +129,5 @@ An earlier version spread only the moving time from the start, ignoring breaks. 
 ## Next steps
 
 1. Agree on decisions 3 and 4 with the contract owner, then update `FEATURE_CONTRACT.md` for decisions 2–4 (`nr. sessions`, `total km` and `hours alternative` rows).
-2. Validate the converter against `example_row.csv` (event day 2026-10-15). The code is in `RunGuard/preprocessing/strava_clean.py` (`clean_activities`) and `RunGuard/features/strava.py` (`build_features`); `notebooks/strava_to_contract.ipynb` runs them on the export.
-3. Confirm with the team that the Strava modules belong in new `RunGuard/preprocessing/` and `RunGuard/features/` subpackages, next to the project skeleton's `api/`, `interface/` and `ml_logic/`.
+2. Validate the converter against `example_row.csv` (event day 2026-10-15). The code is in `RunGuard/ml_logic/strava.py`: `clean_activities(path)` builds the clean activity log, `build_features(activities, event_day)` the model input row.
+3. Confirm with the team where the Strava code belongs in the project skeleton (`RunGuard/ml_logic/` for now; `RunGuard/interface/` is the alternative).
