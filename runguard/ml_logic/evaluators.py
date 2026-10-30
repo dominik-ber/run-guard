@@ -1,41 +1,136 @@
 import numpy as np
-from sklearn.metrics import roc_auc_score, average_precision_score, roc_curve
+import pandas as pd
+from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve,auc,precision_recall_curve
 
-def evaluate_injury_risk_model(y_true, y_scores, target_fpr=0.10):
-    """
-    Evaluates risk scores against true binary labels.
+import matplotlib.pyplot as plt
 
-    Parameters:
-    -----------
-    y_true : array-like of shape (n_samples,)
-        True binary labels (0 for non-injury, 1 for injury).
-    y_scores : array-like of shape (n_samples,)
-        Predicted risk scores or probabilities from the model.
-    target_fpr : float, default=0.10
-        The target false-alarm rate (False Positive Rate) to evaluate recall at.
+def get_simple_rule_baseline(df):
+    prev_2w_avg = (df['total km.1'] + df['total km.2']) / 2.0
 
-    Returns:
-    --------
-    metrics : dict
-        A dictionary containing ROC-AUC, PR-AUC, the recall at the target FPR,
-        and the actual achieved FPR at that threshold.
-    """
-    # 1. Compute ROC-AUC
-    roc_auc = roc_auc_score(y_true, y_scores)
+    score = df['total km'] / prev_2w_avg
+    y_true = df["injury"]
+    return {
+        'y_true':y_true,
+        'scores':score}
 
-    # 2. Compute PR-AUC (Average Precision is a robust approximation of the area under the PR curve)
-    pr_auc = average_precision_score(y_true, y_scores)
+def get_noskill_baseline(df):
 
-    # 3. Compute Recall at fixed False-Alarm Rate (FPR)
-    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+    CONSTANT_SCORE = 0.5
+    y_true = df["injury"]
 
-    # Find the threshold index where FPR is closest to the target_fpr
-    idx = np.argmin(np.abs(fpr - target_fpr))
+    no_skill_scores = np.ones(len(df)) * CONSTANT_SCORE
 
     return {
-        "roc_auc": float(roc_auc),
-        "pr_auc": float(pr_auc),
-        "recall_at_target_fpr": float(tpr[idx]),
-        "actual_fpr": float(fpr[idx]), # Helpful to verify closeness
-        "threshold": float(thresholds[idx])
+        'y_true':y_true,
+        'scores':no_skill_scores
+        }
+
+def evaluate_injury_risk(y_true, scores):
+    """
+    Evaluate injury risk scores.
+
+    Parameters:
+    - y_true: array-like, true binary labels (0 = healthy, 1 = injury)
+    - scores: array-like, predicted risk scores (or probabilities)
+
+    Returns:
+    - dict containing the PR-AUC, ROC-AUC, and Recall at the target FAR.
+    """
+
+    target_far=0.10 # false alarm rate (FAR)
+    y_true = np.asarray(y_true)
+    scores = np.asarray(scores)
+
+    # 1. PR-AUC (Average Precision score)
+    pr_auc = average_precision_score(y_true, scores)
+
+    # 2. ROC-AUC
+    roc_auc = roc_auc_score(y_true, scores)
+
+    # 3. Recall at a fixe False Alarm Rate (FAR / FPR)
+    fpr, tpr, _ = roc_curve(y_true, scores)
+    valid_indices = np.where(fpr <= target_far)[0]
+    recall_at_far = tpr[valid_indices[-1]]
+
+    return {
+        "pr_auc": pr_auc,
+        "roc_auc": roc_auc,
+        "recall_at_far_10%": recall_at_far
     }
+
+def plot_roc_pr_curves(y_true, y_scores):
+  """Trace les courbes ROC-AUC et PR-AUC côte à côte.
+
+  Parameters:
+  - y_true : Vraies étiquettes (0 ou 1)
+  - y_scores : Probabilités prédites pour la classe positive (entre 0 et 1)
+  """
+  # 1. Calculs pour la courbe ROC
+  fpr, tpr, _ = roc_curve(y_true, y_scores)
+  roc_auc = auc(fpr, tpr)
+
+  # 2. Calculs pour la courbe Precision-Recall
+  precision, recall, _ = precision_recall_curve(y_true, y_scores)
+  pr_auc = average_precision_score(y_true, y_scores)
+
+  # Création de la figure avec deux sous-graphiques côte à côte
+  fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+  # --- Graphique 1 : ROC-AUC ---
+  axes[0].plot(
+      fpr,
+      tpr,
+      color='darkorange',
+      lw=2,
+      label=f'Courbe ROC (AUC = {roc_auc:.3f})',
+  )
+  axes[0].plot(
+      [0, 1],
+      [0, 1],
+      color='navy',
+      lw=2,
+      linestyle='--',
+      label='Aléatoire (0.500)',
+  )
+  axes[0].set_xlim([0.0, 1.0])
+  axes[0].set_ylim([0.0, 1.05])
+  axes[0].set_xlabel('False positive rate (FPR)', fontsize=12)
+  axes[0].set_ylabel('True positive rate (TPR / Recall)', fontsize=12)
+  axes[0].set_title('Courbe ROC', fontsize=14, fontweight='bold')
+  axes[0].legend(loc='lower right', fontsize=11)
+  axes[0].grid(alpha=0.3)
+
+  # --- Graphique 2 : PR-AUC ---
+  axes[1].plot(
+      recall,
+      precision,
+      color='blue',
+      lw=2,
+      label=f'Courbe PR (AP = {pr_auc:.3f})',
+  )
+  axes[1].set_xlim([0.0, 1.0])
+  axes[1].set_ylim([0.0, 1.05])
+  axes[1].set_xlabel('Recall', fontsize=12)
+  axes[1].set_ylabel('Precision', fontsize=12)
+  axes[1].set_title('Precision-Recall curve (PR)', fontsize=14, fontweight='bold')
+  axes[1].legend(loc='lower left', fontsize=11)
+  axes[1].grid(alpha=0.3)
+
+  plt.tight_layout()
+  plt.show()
+
+
+
+
+
+
+# ==========================================
+# Exemple d'utilisation avec votre structure
+# ==========================================
+if __name__ == "__main__":
+
+    df = pd.read_csv("injury_prediction_dataset.csv")
+    no_skill_scores = get_noskill_baseline(df)
+    simple_rule_scores = get_simple_rule_baseline(df)
+
+plot_roc_pr_curves(no_skill_scores['y_true'], no_skill_scores['scores'])
