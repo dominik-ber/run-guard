@@ -39,3 +39,6 @@ def xgboost_model(X_train, y_train, X_test, y_test):
 
     # 6. Evaluate using the previously defined plot_roc_pr_curves function
     #plot_roc_pr_curves(y_test, y_scores)
+### put here everything for the model: initialize, compile, train, evaliate, predict
+### save function for trained model in the cloud (ml flow?)
+### load function to load the model later in the api
