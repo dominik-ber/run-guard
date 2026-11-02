@@ -1,5 +1,5 @@
 import xgboost as xgb
-import os
+import pandas as pd
 
 def train_model(model, X_train, y_train):
 
@@ -9,13 +9,13 @@ def train_model(model, X_train, y_train):
 
 def save_model(model, model_path=None):
 
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    # timestamp = time.strftime("%Y%m%d-%H%M%S")
 
-    # Save model locally
-    model_path = os.path.join(LOCAL_REGISTRY_PATH, "models", f"{timestamp}.h5")
+    # # Save model locally
+    # model_path = os.path.join(LOCAL_REGISTRY_PATH, "models", f"{timestamp}.h5")
 
-    model.save_model(model_path)
-    return model
+    # model.save_model(model_path)
+    return None
 
 def evaluate_model() :
     """
@@ -91,7 +91,11 @@ def predict(model, X_test):
     return y_scores
 
 def test():
+
+#    os.path.join(LOCAL_REGISTRY_PATH, "models")
     print("hello")
 
 if __name__ == "__main__":
+
+    breakpoint()
     test()
