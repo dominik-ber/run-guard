@@ -8,3 +8,4 @@ notebooks/
 build/
 *.csv
 runguard.egg-info/
+__pycache__/

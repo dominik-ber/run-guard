@@ -84,7 +84,7 @@ def train_test_data_prep(data: pd.DataFrame):
     assert set(g_train).isdisjoint(set(g_test)), "Athlete leakage!"
     print("length train/test: ", len(X_train), len(X_test))
     print("injuries  train/test:", y_train.sum(), y_test.sum())
-    print("inj. rate train/test:", y_train.mean().round(4), y_test.mean().round(4))
+    #print("inj. rate train/test:", y_train.mean().round(4), y_test.mean().round(4))
     print("athletes  train/test:", g_train.nunique(), g_test.nunique())
     print("athlete IDs used in the train split:", set(g_train))
     print("athlete IDs used in the test split:", set(g_test))

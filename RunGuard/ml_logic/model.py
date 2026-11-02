@@ -91,11 +91,12 @@ def predict(model, X_test):
     return y_scores
 
 def test():
+    from RunGuard.ml_logic.train_test_data import train_test_data_prep
+    df = pd.read_csv("raw_data/day_approach_maskedID_timeseries.csv").head()
+    X_train, y_train, X_test, y_test = train_test_data_prep(df)
 
-#    os.path.join(LOCAL_REGISTRY_PATH, "models")
-    print("hello")
-
+    #print("Train shape:", X_train.shape, y_train.shape)
+    model = initialize_xgboost_model(y_train)
+    train_model(model, X_train, y_train)
 if __name__ == "__main__":
-
-    breakpoint()
     test()
