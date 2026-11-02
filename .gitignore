@@ -9,3 +9,4 @@ notebooks/
 .claude/
 build/
 runguard.egg-info/
+notebooks/*
