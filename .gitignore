@@ -3,3 +3,10 @@ data/processed/
 data/raw
 notebooks/
 .claude/
+.DS_Store
+.env
+build/
+*.csv
+runguard.egg-info/
+__pycache__/
+RunGuard/models/

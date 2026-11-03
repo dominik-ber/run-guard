@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.git
+.gitignore
+.venv
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+data/
+raw_data/
+notebooks/
+*.csv
