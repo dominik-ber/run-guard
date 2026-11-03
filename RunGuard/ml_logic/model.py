@@ -1,25 +1,58 @@
 import xgboost as xgb
 import pandas as pd
+import pickle
+from pathlib import Path
+import time
+
 
 def train_model(model, X_train, y_train):
-
-    # 4. Train the model (No hyperparameter tuning)
     history = model.fit(X_train, y_train)
     return history, model
 
-def save_model(model, model_path=None):
+def load_model(model_name):
+    """
+    Load a trained model from a pickle file in the 'models' directory.
+    Parameters:
+    model_name (str): Name of the model file to be loaded (e.g., 'model_20230101-123456.pkl').
+    Returns:
+    Trained XGBoost model.
+    """
 
-    # timestamp = time.strftime("%Y%m%d-%H%M%S")
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    models_dir = PROJECT_ROOT / "models"
+    model_path = models_dir / model_name
 
-    # # Save model locally
-    # model_path = os.path.join(LOCAL_REGISTRY_PATH, "models", f"{timestamp}.h5")
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model file '{model_name}' not found in '{models_dir}'.")
 
-    # model.save_model(model_path)
-    return None
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+
+    return model
+
+def save_model(model):
+    """
+    Save the trained model to a file with a timestamp in the 'models' directory.
+    The model is saved in pickle format.
+    Parameters:
+    model: Trained XGBoost model to be saved.
+    Returns:
+    None
+    """
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    models_dir = PROJECT_ROOT / "models"
+    models_dir.mkdir(exist_ok=True)
+
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    with open(models_dir / f"model_{timestamp}.pkl", "wb") as f:
+        pickle.dump(model, f)
+
+    return print(f"Model saved in : {models_dir / f'model_{timestamp}.pkl'}")
 
 def evaluate_model() :
     """
-    Evaluate trained model performance on the dataset
+    TODO Evaluate trained model performance on the dataset
     """
 
     return None
@@ -89,14 +122,3 @@ def predict(model, X_test):
     """
     y_scores = model.predict_proba(X_test)[:, 1]
     return y_scores
-
-def test():
-    from RunGuard.ml_logic.train_test_data import train_test_data_prep
-    df = pd.read_csv("raw_data/day_approach_maskedID_timeseries.csv").head()
-    X_train, y_train, X_test, y_test = train_test_data_prep(df)
-
-    #print("Train shape:", X_train.shape, y_train.shape)
-    model = initialize_xgboost_model(y_train)
-    train_model(model, X_train, y_train)
-if __name__ == "__main__":
-    test()

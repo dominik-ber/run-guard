@@ -9,3 +9,4 @@ build/
 *.csv
 runguard.egg-info/
 __pycache__/
+RunGuard/models/
