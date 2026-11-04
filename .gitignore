@@ -9,7 +9,5 @@ notebooks/
 .claude/
 build/
 runguard.egg-info/
-.DS_Store
-.env
 __pycache__/
 RunGuard/models/
