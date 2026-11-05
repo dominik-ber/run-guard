@@ -1,9 +1,10 @@
 from fastapi import FastAPI
-from RunGuard.ml_logic.strava import build_features, clean_activities
 import pickle
 import pandas as pd
 
-from ml_logic.model import predict
+from RunGuard.ml_logic.model import predict
+from RunGuard.ml_logic.strava import build_features, clean_activities
+from RunGuard.ml_logic.model import load_model
 
 # FastAPI instance
 app = FastAPI()
@@ -15,8 +16,8 @@ def health():
 
 # Prediction endpoint
 @app.get("/predict")
-def predict(file):
-    from RunGuard.ml_logic.model import load_model
+def predict_endpoint(file):
+
     activities = clean_activities(file)
     row = build_features(activities)
     # model_name chosen is placeholder
@@ -24,4 +25,4 @@ def predict(file):
     # Use the predict function in the package to run the prediction
     prediction = predict(model, row)
 
-    return {'prediction': f"{prediction}%"}
+    return {'prediction': f"{prediction[0] * 100:.1f}%"}
