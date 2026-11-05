@@ -7,6 +7,10 @@ from RunGuard.ml_logic.strava import build_features, prepare_activities
 # FastAPI instance
 app = FastAPI()
 
+# Model_name chosen is the one I use locally
+# Called before endpoint to only load once at startup, not at every call
+model = load_model('model_20261105-144722.pkl')
+
 # Health endpoint
 @app.get("/health")
 def health():
@@ -22,9 +26,6 @@ def predict_endpoint(file: UploadFile):
     # Clean the data and build a row for prediction
     activities = prepare_activities(raw)
     row = build_features(activities)
-
-    # Model_name chosen is the one I use locally
-    model = load_model('model_20261105-144722.pkl')
 
     # Use the predict function in the package to run the prediction
     prediction = predict(model, row)

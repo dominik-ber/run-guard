@@ -15,18 +15,26 @@ def train_model(model, X_train, y_train):
     history = model.fit(X_train, y_train)
     return history, model
 
-def load_model(model_name):
+def load_model(model_name=None):
     """
     Load a trained model from a pickle file in the 'models' directory.
     Parameters:
-    model_name (str): Name of the model file to be loaded (e.g., 'model_20230101-123456.pkl').
+    model_name (str, optional): Name of the model file to be loaded (e.g., 'model_20230101-123456.pkl').
+        If None, the most recently saved model is loaded.
     Returns:
     Trained XGBoost model.
     """
 
     PROJECT_ROOT = Path(__file__).resolve().parents[1]
     models_dir = PROJECT_ROOT / "models"
-    model_path = models_dir / model_name
+
+    if model_name is None:
+        model_paths = sorted(models_dir.glob("model_*.pkl"))
+        if not model_paths:
+            raise FileNotFoundError(f"No model found in '{models_dir}'. Run: python -m RunGuard.ml_logic.model")
+        model_path = model_paths[-1]
+    else:
+        model_path = models_dir / model_name
 
     if not model_path.exists():
         raise FileNotFoundError(f"Model file '{model_name}' not found in '{models_dir}'.")
