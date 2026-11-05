@@ -7,9 +7,8 @@ from RunGuard.ml_logic.strava import build_features, prepare_activities
 # FastAPI instance
 app = FastAPI()
 
-# Model_name chosen is the one I use locally
 # Called before endpoint to only load once at startup, not at every call
-model = load_model('model_20261105-144722.pkl')
+model = load_model()
 
 # Health endpoint
 @app.get("/health")
