@@ -1,10 +1,8 @@
-from fastapi import FastAPI
-import pickle
+from fastapi import FastAPI, UploadFile
 import pandas as pd
 
-from RunGuard.ml_logic.model import predict
-from RunGuard.ml_logic.strava import build_features, clean_activities
-from RunGuard.ml_logic.model import load_model
+from RunGuard.ml_logic.model import load_model, predict
+from RunGuard.ml_logic.strava import build_features, prepare_activities
 
 # FastAPI instance
 app = FastAPI()
@@ -15,14 +13,20 @@ def health():
     return {'status': "ok"}
 
 # Prediction endpoint
-@app.get("/predict")
-def predict_endpoint(file):
+@app.post("/predict")
+def predict_endpoint(file: UploadFile):
 
-    activities = clean_activities(file)
+    # Accept the uploaded file and store in pd df
+    raw = pd.read_csv(file.file, low_memory=False)
+
+    # Clean the data and build a row for prediction
+    activities = prepare_activities(raw)
     row = build_features(activities)
-    # model_name chosen is placeholder
-    model = load_model('model_20230101-123456.pkl')
+
+    # Model_name chosen is the one I use locally
+    model = load_model('model_20261105-144722.pkl')
+
     # Use the predict function in the package to run the prediction
     prediction = predict(model, row)
 
-    return {'prediction': f"{prediction[0] * 100:.1f}%"}
+    return {'probability': float(prediction[0])}

@@ -7,6 +7,9 @@ from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve,au
 import numpy as np
 import matplotlib.pyplot as plt
 
+from RunGuard.ml_logic.train_test_data import train_test_data_prep
+
+
 
 def train_model(model, X_train, y_train):
     history = model.fit(X_train, y_train)
@@ -241,3 +244,15 @@ def plot_roc_pr_curves(y_true, y_scores):
 
   plt.tight_layout()
   plt.show()
+
+
+if __name__ == "__main__":
+
+    data = pd.read_csv("raw_data/day_approach_maskedID_timeseries.csv")
+    X_train, y_train, X_test, y_test = train_test_data_prep(data)
+
+    model = initialize_xgboost_model(y_train)
+    history, model = train_model(model, X_train, y_train)
+
+    print(evaluate_injury_risk(y_test, predict(model, X_test)))
+    save_model(model)
