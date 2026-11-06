@@ -1,9 +1,13 @@
 import base64
 from pathlib import Path
 
+import os
+
+import requests
 import streamlit as st
 
 LOGO_PATH = Path(__file__).parent / "assets" / "logo.png"
+API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 st.set_page_config(page_title="RunGuard", page_icon=str(LOGO_PATH))
 
@@ -27,11 +31,25 @@ uploaded_file = st.file_uploader("Upload your training data (CSV)", type="csv")
 
 # Predict
 if st.button("Predict"):
-    # TODO: process CSV and call /predict — fake response until the API is ready
-    response = {"risk_score": "Low", "probability": 0.27}
-
-    st.write(f"Current injury risk score: **{response['risk_score']}**")
-    st.write(f"Probability of injury at next run: **{response['probability']:.0%}**")
+    if uploaded_file is None:
+        st.warning("Please upload your activities.csv first.")
+    else:
+        # Send the raw CSV; the API cleans it and builds the features
+        files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
+        try:
+            r = requests.post(f"{API_URL}/predict", files=files, timeout=30)
+        except requests.exceptions.RequestException:
+            st.error(f"Could not reach the prediction API at {API_URL}.")
+        else:
+            if r.ok:
+                response = r.json()
+                st.write(f"Probability of injury at next run: **{response['probability']:.0%}**")
+            else:
+                try:
+                    detail = r.json().get("detail", r.text)
+                except ValueError:
+                    detail = r.text
+                st.error(f"Prediction failed: {detail}")
 
 # Footer
 st.divider()
