@@ -9,6 +9,4 @@ __pycache__/
 build/
 dist/
 data/
-raw_data/
 notebooks/
-*.csv
