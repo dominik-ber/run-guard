@@ -7,23 +7,34 @@ from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve,au
 import numpy as np
 import matplotlib.pyplot as plt
 
+from RunGuard.ml_logic.train_test_data import train_test_data_prep
+
+
 
 def train_model(model, X_train, y_train):
     history = model.fit(X_train, y_train)
     return history, model
 
-def load_model(model_name):
+def load_model(model_name=None):
     """
     Load a trained model from a pickle file in the 'models' directory.
     Parameters:
-    model_name (str): Name of the model file to be loaded (e.g., 'model_20230101-123456.pkl').
+    model_name (str, optional): Name of the model file to be loaded (e.g., 'model_20230101-123456.pkl').
+        If None, the most recently saved model is loaded.
     Returns:
     Trained XGBoost model.
     """
 
     PROJECT_ROOT = Path(__file__).resolve().parents[1]
     models_dir = PROJECT_ROOT / "models"
-    model_path = models_dir / model_name
+
+    if model_name is None:
+        model_paths = sorted(models_dir.glob("model_*.pkl"))
+        if not model_paths:
+            raise FileNotFoundError(f"No model found in '{models_dir}'. Run: python -m RunGuard.ml_logic.model")
+        model_path = model_paths[-1]
+    else:
+        model_path = models_dir / model_name
 
     if not model_path.exists():
         raise FileNotFoundError(f"Model file '{model_name}' not found in '{models_dir}'.")
@@ -241,3 +252,15 @@ def plot_roc_pr_curves(y_true, y_scores):
 
   plt.tight_layout()
   plt.show()
+
+
+if __name__ == "__main__":
+
+    data = pd.read_csv("raw_data/day_approach_maskedID_timeseries.csv")
+    X_train, y_train, X_test, y_test = train_test_data_prep(data)
+
+    model = initialize_xgboost_model(y_train)
+    history, model = train_model(model, X_train, y_train)
+
+    print(evaluate_injury_risk(y_test, predict(model, X_test)))
+    save_model(model)
