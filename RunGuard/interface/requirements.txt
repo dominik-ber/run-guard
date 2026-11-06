@@ -1,5 +1,2 @@
 streamlit
 requests
-base64
-pathlib
-os
