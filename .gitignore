@@ -11,3 +11,4 @@ build/
 runguard.egg-info/
 __pycache__/
 RunGuard/models/
+.garmin_token.json
