@@ -64,7 +64,7 @@ def save_model(model):
 
     return print(f"Model saved in : {models_dir / f'model_{timestamp}.pkl'}")
 
-def evaluate_model(model, X_test, y_test, plot=False):
+def evaluate_model(model, X_test, y_test):
     """
     Evaluate the trained model against the baselines on the same test set.
 
@@ -72,8 +72,6 @@ def evaluate_model(model, X_test, y_test, plot=False):
     model: Trained XGBoost model.
     X_test (pd.DataFrame): Test features.
     y_test (pd.Series): Test target (1 = injury).
-    plot (bool): Also show the ROC and PR curves of the model (off by default,
-        because there is no display during e.g. the Docker build).
 
     Returns:
     pd.DataFrame: one row per scorer (xgboost, no_skill), one column per metric.
@@ -85,9 +83,6 @@ def evaluate_model(model, X_test, y_test, plot=False):
         "xgboost": predict(model, X_test),
         "no_skill": get_noskill_baseline(X_test),
     }
-
-    if plot:
-        plot_roc_pr_curves(y_test, scores["xgboost"])
 
     results = {name: evaluate_injury_risk(y_test, s) for name, s in scores.items()}
     return pd.DataFrame(results).T.astype(float).round(4)
