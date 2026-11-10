@@ -10,3 +10,5 @@ build/
 dist/
 data/
 notebooks/
+**/.garmin_token.json
+**/garmin_activities_*.json

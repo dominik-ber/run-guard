@@ -26,30 +26,45 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Upload --> this is where "activities.csv" download from Strava is loaded
-uploaded_file = st.file_uploader("Upload your training data (CSV)", type="csv")
+def call_api_and_show(method, path, **kwargs):
+    """Call the prediction API and show the probability, or the error it returned."""
+    try:
+        r = requests.request(method, f"{API_URL}{path}", **kwargs)
+    except requests.exceptions.RequestException:
+        st.error(f"Could not reach the prediction API at {API_URL}.")
+        return
 
-# Predict
-if st.button("Predict"):
-    if uploaded_file is None:
-        st.warning("Please upload your activities.csv first.")
+    if r.ok:
+        st.write(f"Probability of injury at next run: **{r.json()['probability']:.0%}**")
     else:
-        # Send the raw CSV; the API cleans it and builds the features
-        files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
         try:
-            r = requests.post(f"{API_URL}/predict", files=files, timeout=30)
-        except requests.exceptions.RequestException:
-            st.error(f"Could not reach the prediction API at {API_URL}.")
+            detail = r.json().get("detail", r.text)
+        except ValueError:
+            detail = r.text
+        st.error(f"Prediction failed: {detail}")
+
+
+strava_tab, garmin_tab = st.tabs(["Strava upload", "Garmin (demo account)"])
+
+# Strava: the user uploads the "activities.csv" from their Strava data export
+with strava_tab:
+    uploaded_file = st.file_uploader("Upload your Strava activities.csv", type="csv")
+
+    if st.button("Predict", key="predict_strava"):
+        if uploaded_file is None:
+            st.warning("Please upload your activities.csv first.")
         else:
-            if r.ok:
-                response = r.json()
-                st.write(f"Probability of injury at next run: **{response['probability']:.0%}**")
-            else:
-                try:
-                    detail = r.json().get("detail", r.text)
-                except ValueError:
-                    detail = r.text
-                st.error(f"Prediction failed: {detail}")
+            # Send the raw CSV; the API cleans it and builds the features
+            files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
+            call_api_and_show("POST", "/predict", files=files, timeout=30)
+
+# Garmin: the API fetches the activities live from the connected (demo) account
+with garmin_tab:
+    st.caption("Uses the last 7 days of the connected Garmin account (demo data).")
+
+    if st.button("Fetch from Garmin & predict", key="predict_garmin"):
+        with st.spinner("Fetching activities from Garmin..."):
+            call_api_and_show("GET", "/predict/garmin", timeout=60)
 
 # Footer
 st.divider()

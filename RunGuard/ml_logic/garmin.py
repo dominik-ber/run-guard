@@ -43,7 +43,8 @@ REFRESH_WINDOW_SECONDS = 60 * 60  # refresh if the token expires within 1 hour
 PAGE_SIZE = 100  # activities per request when paging
 
 # Token cache lives next to this file by default; keep it out of git.
-TOKEN_CACHE_FILE = Path(__file__).parent / ".garmin_token.json"
+# Override with GARMIN_TOKEN_CACHE (e.g. /tmp/.garmin_token.json on Cloud Run).
+TOKEN_CACHE_FILE = Path(os.getenv("GARMIN_TOKEN_CACHE", Path(__file__).parent / ".garmin_token.json"))
 
 
 # ---------------------------------------------------------------------------
@@ -181,15 +182,16 @@ _GARMIN_TO_STRAVA_TYPE = {
 }
 
 
-def process_data(json_path, event_day=None):
-    """Read a saved Garmin activities JSON and return the model input row.
+def process_data(source, event_day=None):
+    """Turn Garmin activities into the model input row.
 
     Selects only the columns the contract needs (start time, type, distance,
     moving and elapsed time), then builds 4 base features x 7 days = 28 columns
     in FEATURE_CONTRACT.md order, using the same rules as the Strava pipeline.
 
     Args:
-        json_path: path to the JSON written by the CLI below.
+        source: the list returned by fetch_activities(), or a path to the JSON
+            written by the CLI below.
         event_day: date to predict for (default: the day after the last activity).
 
     Returns:
@@ -199,7 +201,11 @@ def process_data(json_path, event_day=None):
 
     from RunGuard.ml_logic.strava import CONTRACT_COLUMNS, build_features, prepare_activities
 
-    raw = pd.json_normalize(json.loads(Path(json_path).read_text(encoding="utf-8")))
+    if isinstance(source, list):
+        data = source
+    else:
+        data = json.loads(Path(source).read_text(encoding="utf-8"))
+    raw = pd.json_normalize(data)
     if raw.empty:
         return build_features(pd.DataFrame(), event_day)
 
