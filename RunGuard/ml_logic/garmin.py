@@ -24,6 +24,7 @@ Usage:
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import time
@@ -82,43 +83,70 @@ def _write_cached_token(access_token: str, expires_at: float) -> None:
         json.dump({"access_token": access_token, "expires_at": expires_at}, f)
 
 
-def get_token(force_refresh: bool = False) -> str:
-    """Return a valid bearer token, reusing the cache unless it is (nearly) expired.
+class GarminAuthError(Exception):
+    """Garmin rejected the API key (invalid, revoked or not authorised)."""
 
-    Set force_refresh=True to always request a new token (e.g. after a 401).
-    """
-    if not force_refresh:
-        cached = _read_cached_token()
-        if cached and cached["expires_at"] - time.time() > REFRESH_WINDOW_SECONDS:
-            return cached["access_token"]
 
-    # Exchange the API key for a new bearer token.
+# Tokens of user-supplied keys: kept in memory only, keyed by a hash of the key,
+# so different users never share a token and no key is ever written to disk.
+_user_tokens: dict = {}
+
+
+def _exchange_key(api_key: str) -> str:
+    """Exchange an API key for a new bearer token."""
     response = requests.post(
         f"{BASE_URL}{TOKEN_PATH}",
-        headers={"Accept": "*/*", "Authorization": f"ApiKey {load_api_key()}"},
+        headers={"Accept": "*/*", "Authorization": f"ApiKey {api_key}"},
         timeout=TIMEOUT_SECONDS,
     )
+    if response.status_code in (401, 403):
+        raise GarminAuthError("Garmin rejected the API key")
     response.raise_for_status()
-    access_token = response.text.strip()
-    _write_cached_token(access_token, _jwt_expiry(access_token))
+    return response.text.strip()
+
+
+def get_token(api_key: Optional[str] = None, force_refresh: bool = False) -> str:
+    """Return a valid bearer token, reusing the cache unless it is (nearly) expired.
+
+    api_key=None uses the server's own key from .env / the environment and the
+    token cache file. A user-supplied api_key uses an in-memory cache instead.
+    Set force_refresh=True to always request a new token (e.g. after a 401).
+    """
+    if api_key is None:
+        cached = None if force_refresh else _read_cached_token()
+    else:
+        cache_key = hashlib.sha256(api_key.encode()).hexdigest()
+        cached = None if force_refresh else _user_tokens.get(cache_key)
+
+    if cached and cached["expires_at"] - time.time() > REFRESH_WINDOW_SECONDS:
+        return cached["access_token"]
+
+    access_token = _exchange_key(api_key if api_key is not None else load_api_key())
+    expires_at = _jwt_expiry(access_token)
+    if api_key is None:
+        _write_cached_token(access_token, expires_at)
+    else:
+        _user_tokens[cache_key] = {"access_token": access_token, "expires_at": expires_at}
     return access_token
 
 
 # ---------------------------------------------------------------------------
 # Data access
 # ---------------------------------------------------------------------------
-def _get(path: str, params: Optional[dict] = None):
+def _get(path: str, params: Optional[dict] = None, api_key: Optional[str] = None):
     """Authenticated GET. On a 401 (e.g. revoked token), refresh once and retry."""
     for attempt in range(2):
-        token = get_token(force_refresh=(attempt == 1))
+        token = get_token(api_key, force_refresh=(attempt == 1))
         response = requests.get(
             f"{BASE_URL}{path}",
             headers={"Accept": "application/json", "Authorization": f"Bearer {token}"},
             params=params,
             timeout=TIMEOUT_SECONDS,
         )
-        if response.status_code == 401 and attempt == 0:
-            continue  # token rejected -> retry with a fresh one
+        if response.status_code == 401:
+            if attempt == 0:
+                continue  # token rejected -> retry with a fresh one
+            raise GarminAuthError("Garmin rejected the token")
         response.raise_for_status()
         return response.json() if response.content else None
 
@@ -127,6 +155,7 @@ def fetch_activities(
     days: int = 90,
     end_date: Optional[date] = None,
     activity_type: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> list:
     """Fetch all activities from the `days` days up to and including `end_date`.
 
@@ -134,6 +163,7 @@ def fetch_activities(
         days: size of the look-back window (default 90).
         end_date: last day of the window (default today).
         activity_type: optional Garmin activity type filter, e.g. "running".
+        api_key: a user's Personal API key (default: the server's own key).
 
     Returns:
         A list of activity summary dicts, as returned by Garmin.
@@ -153,7 +183,7 @@ def fetch_activities(
         if activity_type:
             params["activityType"] = activity_type
 
-        page = _get(ACTIVITIES_PATH, params=params) or []
+        page = _get(ACTIVITIES_PATH, params=params, api_key=api_key) or []
         activities.extend(page)
         if len(page) < PAGE_SIZE:  # last page reached
             break

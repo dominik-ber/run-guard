@@ -44,7 +44,7 @@ def call_api_and_show(method, path, **kwargs):
         st.error(f"Prediction failed: {detail}")
 
 
-strava_tab, garmin_tab = st.tabs(["Strava upload", "Garmin (demo account)"])
+strava_tab, garmin_tab = st.tabs(["Strava upload", "Garmin"])
 
 # Strava: the user uploads the "activities.csv" from their Strava data export
 with strava_tab:
@@ -58,13 +58,22 @@ with strava_tab:
             files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv")}
             call_api_and_show("POST", "/predict", files=files, timeout=30)
 
-# Garmin: the API fetches the activities live from the connected (demo) account
+# Garmin: the API fetches the activities live with the user's own Personal API key
 with garmin_tab:
-    st.caption("Uses the last 7 days of the connected Garmin account (demo data).")
+    api_key = st.text_input(
+        "Garmin Personal API key",
+        type="password",  # masked in the browser; only kept for this session
+        help="The key is only used for this request and is never stored.",
+    )
+    st.caption(
+        "Uses your last 7 days of Garmin activities. "
+        "[How to get a Personal API key](https://developer.garmin.com/gc-developer-program/personal/personal-api/). "
+        "Leave empty to try the demo account."
+    )
 
     if st.button("Fetch from Garmin & predict", key="predict_garmin"):
         with st.spinner("Fetching activities from Garmin..."):
-            call_api_and_show("GET", "/predict/garmin", timeout=60)
+            call_api_and_show("POST", "/predict/garmin", json={"api_key": api_key}, timeout=60)
 
 # Footer
 st.divider()

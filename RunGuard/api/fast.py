@@ -1,8 +1,11 @@
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException, UploadFile
 import pandas as pd
+from pydantic import BaseModel
 import requests
 
-from RunGuard.ml_logic.garmin import fetch_activities, process_data
+from RunGuard.ml_logic.garmin import GarminAuthError, fetch_activities, process_data
 from RunGuard.ml_logic.model import load_model, predict
 from RunGuard.ml_logic.strava import build_features, prepare_activities
 
@@ -34,17 +37,28 @@ def predict_endpoint(file: UploadFile):
     return {'probability': float(prediction[0])}
 
 
-# Garmin prediction endpoint: fetches live, nothing is stored on disk
-@app.get("/predict/garmin")
-def predict_garmin():
+# Request body for the Garmin endpoint. POST body, not a URL parameter,
+# so the key never ends up in server or proxy logs.
+class GarminRequest(BaseModel):
+    api_key: Optional[str] = None  # empty -> the server's own (demo) key
 
-    # 14 days = the 7-day window plus margin for activities spanning midnight
+
+# Garmin prediction endpoint: fetches live, nothing is stored on disk
+@app.post("/predict/garmin")
+def predict_garmin(body: GarminRequest):
+
+    api_key = (body.api_key or "").strip() or None
+
+    # 14 days = the 7-day window plus margin for activities spanning midnight.
+    # Error messages are fixed text on purpose: never echo anything key-related.
     try:
-        activities = fetch_activities(days=14)
-    except RuntimeError as e:  # API key missing
-        raise HTTPException(status_code=500, detail=str(e))
-    except requests.RequestException as e:  # Garmin unreachable / rejected
-        raise HTTPException(status_code=502, detail=f"Garmin request failed: {e}")
+        activities = fetch_activities(days=14, api_key=api_key)
+    except GarminAuthError:
+        raise HTTPException(status_code=401, detail="Invalid Garmin API key.")
+    except RuntimeError:  # no key given and no server key configured
+        raise HTTPException(status_code=400, detail="Please enter your Garmin API key.")
+    except requests.RequestException:  # Garmin unreachable or returned an error
+        raise HTTPException(status_code=502, detail="Garmin request failed, please try again later.")
 
     # Event day = today, so the window is the last 7 full days
     row = process_data(activities, event_day=pd.Timestamp.today().normalize())
