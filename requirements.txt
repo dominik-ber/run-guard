@@ -2,6 +2,7 @@ fastapi
 matplotlib
 numpy
 pandas
+python-dotenv
 python-multipart
 requests
 scikit-learn
