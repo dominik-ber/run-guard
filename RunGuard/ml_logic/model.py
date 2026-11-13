@@ -63,12 +63,28 @@ def save_model(model):
 
     return print(f"Model saved in : {models_dir / f'model_{timestamp}.pkl'}")
 
-def evaluate_model() :
+def evaluate_model(model, X_test, y_test):
     """
-    TODO Evaluate trained model performance on the dataset
-    """
+    Evaluate the trained model against the baselines on the same test set.
 
-    return None
+    Parameters:
+    model: Trained XGBoost model.
+    X_test (pd.DataFrame): Test features.
+    y_test (pd.Series): Test target (1 = injury).
+
+    Returns:
+    pd.DataFrame: one row per scorer (xgboost, no_skill), one column per metric.
+
+    TODO: add a simple-rule baseline (acute:chronic workload ratio) once the
+    ACWR feature over ~28 days exists; a 7-day window is too short for it.
+    """
+    scores = {
+        "xgboost": predict(model, X_test),
+        "no_skill": get_noskill_baseline(X_test),
+    }
+
+    results = {name: evaluate_injury_risk(y_test, s) for name, s in scores.items()}
+    return pd.DataFrame(results).T.astype(float).round(4)
 
 def initialize_xgboost_model(y_train) :
     """
@@ -106,10 +122,27 @@ def initialize_xgboost_model(y_train) :
         "n_jobs": -1,  # Utilise tous les cœurs du processeur
     }
 
-
+    params = {
+        "objective": "binary:logistic",
+        "eval_metric": "aucpr",
+        "tree_method": "hist",
+        "scale_pos_weight": (y_train == 0).sum() / (y_train == 1).sum(),
+        "learning_rate": 0.03,
+        "max_depth": 3,
+        "min_child_weight": 10,
+        "gamma": 1,
+        "subsample": 0.8,
+        "colsample_bytree": 0.6,
+        "reg_lambda": 5,
+        "reg_alpha": 1,
+        "n_estimators": 1000,
+        "early_stopping_rounds": 50,
+        "random_state": 42,
+        "n_jobs": -1,
+    }
 
     # 3. Initialize XGBoost with base_line params
-    model = xgb.XGBClassifier(**baseline_params)
+    model = xgb.XGBClassifier(**params)
 
     # 5. Score / predict probabilities on the test table
     # y_scores = model.predict_proba(X_test)[:, 1]
@@ -137,26 +170,19 @@ def predict(model, X_test):
     return y_scores
 
 
-def get_simple_rule_baseline(df):
-    prev_2w_avg = (df['total km.1'] + df['total km.2']) / 2.0
+def get_noskill_baseline(X_test):
+    """
+    No-skill baseline: the same score for every row, i.e. random guessing.
+    Gives ROC-AUC 0.5 and PR-AUC = the injury rate of the test set.
 
-    score = df['total km'] / prev_2w_avg
-    y_true = df["injury"]
-    return {
-        'y_true':y_true,
-        'scores':score}
+    Parameters:
+    X_test (pd.DataFrame): Test features (only the number of rows is used).
 
-def get_noskill_baseline(df):
-
+    Returns:
+    np.array: constant scores, one per row.
+    """
     CONSTANT_SCORE = 0.5
-    y_true = df["injury"]
-
-    no_skill_scores = np.ones(len(df)) * CONSTANT_SCORE
-
-    return {
-        'y_true':y_true,
-        'scores':no_skill_scores
-        }
+    return np.full(len(X_test), CONSTANT_SCORE)
 
 def evaluate_injury_risk(y_true, scores):
     """
@@ -251,15 +277,3 @@ def plot_roc_pr_curves(y_true, y_scores):
 
   plt.tight_layout()
   plt.show()
-
-
-if __name__ == "__main__":
-
-    data = pd.read_csv("raw_data/day_approach_maskedID_timeseries.csv")
-    X_train, y_train, X_test, y_test = train_test_data_prep(data)
-
-    model = initialize_xgboost_model(y_train)
-    history, model = train_model(model, X_train, y_train)
-
-    print(evaluate_injury_risk(y_test, predict(model, X_test)))
-    save_model(model)
