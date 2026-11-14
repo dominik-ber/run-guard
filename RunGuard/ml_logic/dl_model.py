@@ -169,8 +169,8 @@ def export_mlp_weights(model, feature_names, path=MLP_WEIGHTS_PATH):
     To avoid this problem Claude offer me an option with an import of model weights
     instead of a whole model import.
 
-    Together we have 1105 weight params and 56 normalization params.
-    So as file it should take near 7 Kb
+    Together we have 1473 weight params and 57 normalization params.
+    So as file it should take near 10 Kb
 
     feature_names: the column names the model was trained on, in the same order
         (X_train.columns). numpy only sees the column positions, so we save the
