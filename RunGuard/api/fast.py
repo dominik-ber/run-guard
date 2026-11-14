@@ -5,7 +5,9 @@ import pandas as pd
 from pydantic import BaseModel
 import requests
 
+from RunGuard.interface import init_xgb_no_weight
 from RunGuard.ml_logic.garmin import GarminAuthError, fetch_activities, process_data
+from RunGuard.ml_logic.mlp_numpy import load_mlp_weights, predict_mlp_numpy
 from RunGuard.ml_logic.model import load_model, predict
 from RunGuard.ml_logic.strava import build_features, prepare_activities
 
@@ -14,6 +16,32 @@ app = FastAPI()
 
 # Called before endpoint to only load once at startup, not at every call
 model = load_model()
+
+# Two more models for the side-by-side comparison in the UI (docs/MODEL_COMPARISON.md):
+# XGBoost without class weights, trained by init_xgb_no_weight.py
+model_no_weight = load_model(init_xgb_no_weight.MODEL_FILE_NAME)
+# MLP weights, exported by train_mlp.py; the prediction is computed with numpy, no TensorFlow
+mlp_weights = load_mlp_weights()
+
+
+def predict_all_models(row):
+    """Injury probability of all 3 models for one feature row, as the API response.
+
+    "probability" is the main XGBoost model, under the same key as before,
+    so a client that only reads "probability" keeps working.
+    """
+    # Every predict function returns an array with one value per row; we have one row
+    probability = predict(model, row)
+    probability_no_weight = predict(model_no_weight, row)
+    probability_mlp = predict_mlp_numpy(mlp_weights, row)
+
+    # float() turns the numpy number into a plain Python number, which FastAPI can send as JSON
+    response = {
+        "probability": float(probability[0]),
+        "probability_xgb_no_weight": float(probability_no_weight[0]),
+        "probability_mlp": float(probability_mlp[0]),
+    }
+    return response
 
 # Health endpoint
 @app.get("/health")
@@ -31,10 +59,8 @@ def predict_endpoint(file: UploadFile):
     activities = prepare_activities(raw)
     row = build_features(activities)
 
-    # Use the predict function in the package to run the prediction
-    prediction = predict(model, row)
-
-    return {'probability': float(prediction[0])}
+    # Run the prediction with all 3 models
+    return predict_all_models(row)
 
 
 # Request body for the Garmin endpoint. POST body, not a URL parameter,
@@ -62,6 +88,6 @@ def predict_garmin(body: GarminRequest):
 
     # Event day = today, so the window is the last 7 full days
     row = process_data(activities, event_day=pd.Timestamp.today().normalize())
-    prediction = predict(model, row)
 
-    return {'probability': float(prediction[0])}
+    # Run the prediction with all 3 models
+    return predict_all_models(row)

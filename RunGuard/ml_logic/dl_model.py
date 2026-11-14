@@ -4,11 +4,15 @@ Same input as XGBoost: the 28 contract columns from `train_test_data_prep`.
 Same evaluation: `evaluate_injury_risk` on the same test athletes.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 from tensorflow import keras
 from tensorflow.keras import layers, regularizers
+
+from RunGuard.ml_logic.mlp_numpy import MLP_WEIGHTS_PATH
 
 
 def split_train_val(X_train: pd.DataFrame, y_train: pd.Series, groups: pd.Series,
@@ -156,3 +160,63 @@ def predict_dl_model(model, X: pd.DataFrame) -> np.ndarray:
     """
     # Keras returns shape (n, 1); ravel() turns it into a flat array of n values
     return model.predict(X.to_numpy(dtype="float32"), verbose=0).ravel()
+
+
+def export_mlp_weights(model, feature_names, path=MLP_WEIGHTS_PATH):
+    """Execution of an additional model from our UI will need tensorflow
+    import (this one is large) and will take significant time.
+
+    To avoid this problem Claude offer me an option with an import of model weights
+    instead of a whole model import.
+
+    Together we have 1105 weight params and 56 normalization params.
+    So as file it should take near 7 Kb
+
+    feature_names: the column names the model was trained on, in the same order
+        (X_train.columns). numpy only sees the column positions, so we save the
+        names too and check them before every prediction.
+
+    path: where to save the file; by default the file the API reads
+        (MLP_WEIGHTS_PATH from mlp_numpy.py). The folder is created if it does not exist.
+
+    Returns:
+    The path of the saved file.
+    """
+    # model.layers: Normalization, Dense, Dropout, Dense, Dropout, Dense.
+    # Dropout has no weights and is switched off for predictions, so we skip it.
+    normalizer = model.layers[0]
+    dense_1 = model.layers[1]
+    dense_2 = model.layers[3]
+    dense_3 = model.layers[5]
+
+    # Check that the model has the layers we expect (built by initialize_mlp_model)
+    assert isinstance(normalizer, layers.Normalization), "Layer 0 must be Normalization"
+    assert isinstance(dense_1, layers.Dense), "Layer 1 must be Dense"
+    assert isinstance(dense_2, layers.Dense), "Layer 3 must be Dense"
+    assert isinstance(dense_3, layers.Dense), "Layer 5 must be Dense"
+
+    # Normalization keeps 3 values: mean, variance and the row count (count is not needed)
+    normalizer_weights = normalizer.get_weights()
+    mean = normalizer_weights[0]
+    variance = normalizer_weights[1]
+
+    # Every Dense layer keeps 2 arrays: the weight matrix W and the bias vector b
+    W1, b1 = dense_1.get_weights()
+    W2, b2 = dense_2.get_weights()
+    W3, b3 = dense_3.get_weights()
+
+    # dtype=str stores the names as plain text; without it pandas column names become
+    # an "object" array, which np.load refuses to read (unless allow_pickle=True)
+    feature_names = np.array(list(feature_names), dtype=str)
+
+    # Create the folder, then save all arrays into one file, each under its own name
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    np.savez(path,
+             feature_names=feature_names,
+             mean=mean, variance=variance,
+             W1=W1, b1=b1,
+             W2=W2, b2=b2,
+             W3=W3, b3=b3)
+
+    print(f"MLP weights saved in: {path}")
+    return path

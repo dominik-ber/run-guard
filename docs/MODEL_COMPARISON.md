@@ -52,13 +52,43 @@ ROC-AUC per seed:
    - **Ranking:** without the weight ROC-AUC is higher (0.614 vs 0.583, consistent over all 5 seeds). PR-AUC (0.0220 vs 0.0227) and recall (0.180 vs 0.180) stay the same within noise.
 4. **No model beats a constant on log-loss.** The best value is 0.0800, against 0.0788 for predicting 1.32% for everyone. The models rank athletes somewhat better than chance, but their probabilities for individual days are no more accurate than the average rate. The UI should not present the output as a precise probability without calibration.
 
+## Models in the app (side-by-side comparison)
+
+The API returns the probability of three models, and the UI shows them next to each other.
+
+| API key | Model | How it is produced | Test PR-AUC | Test ROC-AUC | Mean prob. |
+|---|---|---|---|---|---|
+| `probability` | XGBoost with `scale_pos_weight` (main model, unchanged) | `init_model.py`, trained during the Docker build | see above | see above | ~23% |
+| `probability_xgb_no_weight` | XGBoost, `scale_pos_weight = 1` | `init_xgb_no_weight.py`, trained during the Docker build → `RunGuard/models/xgb_no_weight.pkl` | 0.0224 | 0.613 | 1.35% |
+| `probability_mlp` | MLP, seed 42 (fixed in advance, not picked by test score) | `train_mlp.py`, trained locally → `RunGuard/mlp_weights/mlp_v1.npz` (committed, 10 KB) | 0.0232 | 0.619 | 1.29% |
+
+The final MLP happens to be better than the 5-seed mean above. With a seed spread of ±0.047 ROC-AUC this is within noise, so the conclusion stays the same.
+
+**The API does not need TensorFlow.** At prediction time the MLP is one normalization and three matrix multiplications. `train_mlp.py` saves the weights to `.npz`, and `mlp_numpy.py` computes the prediction with numpy. It matches `model.predict` of Keras to within 3·10⁻⁸ on all test rows.
+
+### Calibration check
+
+The test days are split into 5 equal groups by predicted probability. For each group, the table compares the mean prediction with the real injury rate:
+
+| Group | XGBoost (no weight): predicted → real | MLP: predicted → real |
+|---|---|---|
+| lowest 20% | 0.27% → 0.53% | 0.36% → 0.58% |
+| 2 | 0.56% → 1.34% | 0.75% → 1.34% |
+| 3 | 0.89% → 1.58% | 1.11% → 1.52% |
+| 4 | 1.43% → 1.99% | 1.55% → 1.64% |
+| highest 20% | 3.59% → 2.16% | 2.70% → 2.51% |
+
+Both models rank correctly: more risk is predicted where more injuries actually happen. But their probabilities are spread too far from the average. At the bottom they are about 1.5–2× too low. At the top XGBoost is too high, while the MLP is close. Each group has only 9–43 injuries, so these ratios are rough.
+
+Example: Dominik's Strava export (22 km in 3 runs over the last 7 days, against a dataset median of 45 km) gets 11.8% from the main XGBoost, 0.35% from XGBoost without weight and 0.32% from the MLP. The two unweighted models put this week in the lowest-risk group, where the real rate is about 0.5%.
+
 ## Suggested next steps
 
 - **Set `scale_pos_weight = 1` in `model.py` (team decision).** That gives realistic probabilities and a better ROC-AUC with no clear loss on the other metrics. It also fixes the "12% injury risk" the UI currently shows for a typical user. For Dominik's Strava export the weighted model gives 11.75%. XGBoost without the weight gives 0.26–0.43% over 5 seeds, below the average daily rate of 1.5%.
 - **Features before models.** Features normalized per athlete (load compared with the athlete's own usual load) and acute:chronic load ratios are more likely to help than a different model class.
 - **More stable evaluation.** Use all 5 folds of `StratifiedGroupKFold` instead of a single test fold; 14 test athletes make one split noisy.
 - **1D-CNN (Trello card): expectations are low** after this result. Run it with the same script (add a `run_cnn`) so it can be compared directly.
-- **Calibration** of the chosen model before the UI shows percentages, or show relative risk instead ("2× your usual risk").
+- **Calibration** of the chosen model before the UI shows percentages (Platt or isotonic, fitted on validation athletes, see the calibration check above), or show relative risk instead ("2× your usual risk").
 
 ## Reproduce
 
@@ -66,6 +96,11 @@ ROC-AUC per seed:
 # from the repo root, with raw_data/day_approach_maskedID_timeseries.csv in place
 pip install tensorflow xgboost
 python -m RunGuard.ml_logic.compare_models    # about 1.5 minutes on CPU
+
+# models for the app
+python -m RunGuard.interface.init_model           # main XGBoost
+python -m RunGuard.interface.init_xgb_no_weight   # XGBoost without weight
+python -m RunGuard.ml_logic.train_mlp             # MLP weights (needs TensorFlow), only when retraining
 ```
 
 Versions used: Python 3.10.6, TensorFlow 2.21.0 (Keras 3), XGBoost 3.2.0, scikit-learn 1.7.2.
