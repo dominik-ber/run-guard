@@ -26,8 +26,46 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+def show_probabilities(response):
+    """Show the injury probability of the 3 models side by side.
+
+    response: the JSON answer of the API, as a dictionary.
+    """
+    st.write("Probability of injury at next run:")
+
+    # An older API version only returns "probability" (the main XGBoost model).
+    # The UI is redeployed automatically, the API is not, so we handle both cases.
+    if "probability_mlp" not in response:
+        st.metric("XGBoost", f"{response['probability']:.1%}")
+        return
+
+    # Three columns next to each other, one model per column
+    column_1, column_2, column_3 = st.columns(3)
+    column_1.metric(
+        "XGBoost",
+        f"{response['probability']:.1%}",
+        help="Main model. Injury days get extra weight in training (scale_pos_weight).",
+    )
+    column_2.metric(
+        "XGBoost, no weight",
+        f"{response['probability_xgb_no_weight']:.1%}",
+        help="The same XGBoost, trained with every day counting the same.",
+    )
+    column_3.metric(
+        "Neural network (MLP)",
+        f"{response['probability_mlp']:.1%}",
+        help="Small Keras neural network, trained without extra weight.",
+    )
+
+    st.caption(
+        "The main XGBoost counts every injury day about 75 times in training, "
+        "so its numbers come out much higher. The two other models are trained without this weight: "
+        "their numbers are on the real scale, where the average injury rate is about 1.5% per day."
+    )
+
+
 def call_api_and_show(method, path, **kwargs):
-    """Call the prediction API and show the probability, or the error it returned."""
+    """Call the prediction API and show the probabilities, or the error it returned."""
     try:
         r = requests.request(method, f"{API_URL}{path}", **kwargs)
     except requests.exceptions.RequestException:
@@ -35,7 +73,7 @@ def call_api_and_show(method, path, **kwargs):
         return
 
     if r.ok:
-        st.write(f"Probability of injury at next run: **{r.json()['probability']:.0%}**")
+        show_probabilities(r.json())
     else:
         try:
             detail = r.json().get("detail", r.text)
